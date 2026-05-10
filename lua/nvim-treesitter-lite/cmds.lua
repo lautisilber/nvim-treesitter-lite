@@ -1,12 +1,12 @@
 -- Terminology:
--- - parser: a tree-sitter .so file
--- - pname: the name of the parser, meaning the file name of a parser without the .so extension
--- - language: refers to a programming language, which may have multiple pnames associated to it
+-- - parser path: a tree-sitter .so file
+-- - parser: the name of the parser, meaning the file name of a parser without the .so extension
+-- - language: refers to a programming language, which may have multiple parsers associated to it
 --
--- All languages and pnames are cast to lowercase
+-- All languages and parsers are cast to lowercase
 
-local ntl = require("nvim-treesitter-lite")
 local utils = require("nvim-treesitter-lite.utils")
+local ntl = require("nvim-treesitter-lite")
 
 local bundled_languages = {
     [ "c" ] = true,
@@ -14,46 +14,49 @@ local bundled_languages = {
     [ "markdown" ] = true,
     [ "vimscript" ] = true,
     [ "vimdoc" ] = true,
-    [ "query" ] = true, -- tree-sitter query files
+    [ "tsq" ] = true, -- tree-sitter query files
+    [ "query" ] = true, -- another name for tree-sitter query
 };
 
 -- The directory where parsers have to be saved for nvim's bundled tree-sitter to detect them
 local parser_dir = vim.fn.stdpath("data") .. "/site/parser"
 
----Get the path to the parser from the pname
----@param pname string
+---Get the path to the parser from the parser
+---@param parser string
 ---@return string
-local function get_parser_path_from_pname(pname)
-    return parser_dir .. "/" .. pname .. ".so"
+local function get_parser_path_from_parser(parser)
+    return parser_dir .. "/" .. parser .. ".so"
 end
 
----Get all pnames associated with a language
+---Get all parsers associated with a language
 ---@param lang string
 ---@return string[]
-local function get_pnames_from_lang(lang)
-    local pnames = {}
-    if ntl.config.special_languages[lang] ~= nil then
-for _, pname in ipairs(ntl.config.special_languages[lang]["pnames"]) do
-            table.insert(pnames, pname["pname"])
+local function get_parsers_from_lang(lang)
+    local lang_def = ntl.languages[lang]
+    if lang_def ~= nil and lang_def["parsers"] ~= nil then -- tier 2 or 3
+        local parsers = {}
+        for _, p in ipairs(lang_def["parsers"]) do
+            table.insert(parsers, p["parser"])
         end
-    else
-        table.insert(pnames, lang)
+        return parsers
     end
-    return pnames
+    return { lang }
 end
 
----Get lang associated with pname
----@param pname string
+---Get lang associated with parser
+---@param parser string
 ---@return string
-local function get_lang_from_pname(pname)
-    for lang, obj in pairs(ntl.config.special_languages) do
-        for _, _pname in ipairs(obj["pnames"]) do
-            if pname == _pname["pname"] then
-                return lang
+local function get_lang_from_parser(parser)
+    for lang, obj in pairs(ntl.languages) do
+        if obj["parsers"] ~= nil then -- tier 2 or tier 3
+            for _, p in ipairs(obj["parsers"]) do
+                if parser == p["parser"] then
+                    return lang
+                end
             end
         end
     end
-    return pname
+    return parser
 end
 
 ---Get all parser paths associated with a language
@@ -61,15 +64,15 @@ end
 ---@return string[]
 local function get_parser_paths_from_lang(lang)
     local paths = {}
-    for _, pname in ipairs(get_pnames_from_lang(lang)) do
-        table.insert(paths, get_parser_path_from_pname(pname))
+    for _, parser in ipairs(get_parsers_from_lang(lang)) do
+        table.insert(paths, get_parser_path_from_parser(parser))
     end
     return paths
 end
 
----Get pname from parser path
+---Get parser from parser path
 ---@param path string
-local function get_pname_from_parser_path(path)
+local function get_parser_from_parser_path(path)
     return utils.get_basename(path):match("(.+)%.")
 end
 
@@ -156,10 +159,15 @@ local function ts_install(lang, prefix)
         return
     end
 
+    if ntl.languages[lang] == nil then
+        vim.notify(prefix .. ": language '" .. lang .. "' is not supported", vim.log.levels.ERROR)
+        return
+    end
+
     ensure_dir(parser_dir)
 
-    local function install_parser(repo_path, pname)
-        local out = get_parser_path_from_pname(pname)
+    local function install_parser(repo_path, parser)
+        local out = get_parser_path_from_parser(parser)
 
         local c_comp = utils.get_c_comp_path()
         if c_comp == nil then
@@ -196,10 +204,11 @@ local function ts_install(lang, prefix)
                 table.insert(cmd, "-I" .. include_path)
             end
 
+            if no_link then
+                table.insert(cmd, "-c")
+            end
+
             for _, source_path in ipairs(sources) do
-                if no_link then
-                    table.insert(cmd, "-c")
-                end
                 table.insert(cmd, source_path)
             end
 
@@ -248,35 +257,46 @@ local function ts_install(lang, prefix)
 
         else
             -- we only have c files
-            local comp_cmd = get_comp_cmd(c_comp, out, { repo_path }, { scanner_c, parser_c }, true, false, false)
+            local sources = { parser_c }
+            if file_exists(scanner_c) then
+                table.insert(sources, scanner_c)
+            end
+            local comp_cmd = get_comp_cmd(c_comp, out, { repo_path }, sources, true, false, false)
             if utils.run_cmd_sync(comp_cmd, on_compile_error).code ~= 0 then
                 return false
             end
         end
 
-        vim.notify(prefix .. ": installed " .. pname, vim.log.levels.INFO)
+        vim.notify(prefix .. ": installed " .. parser, vim.log.levels.INFO)
         return true
     end
 
     -- from here on, we can't crash, since we need to remove the tmp file
     local tmp = vim.fn.tempname()
     local ok, err = pcall(function ()
-        if ntl.config.special_languages[lang] ~= nil then
-            local url = ntl.config.special_languages[lang]["url"]
-            if not clone_git_repo(url, tmp, prefix) then return end
-            for _, pname_all in ipairs(ntl.config.special_languages[lang]["pnames"]) do
-                local pname = pname_all["pname"]
-                local repo_path = tmp .. "/" .. pname_all["subpath"] .. "/src"
-                install_parser(repo_path, pname)
+        local url = utils.git_repo_url(ntl.languages[lang]["url"])
+        if not clone_git_repo(url, tmp, prefix) then return end
+
+        if ntl.languages[lang].build ~= nil then
+            local cmd = ntl.languages[lang].build(utils, tmp, parser_dir)
+            if cmd == nil then
+                vim.notify(prefix .. ": failed to create custom build command for " .. lang, vim.log.levels.ERROR)
+                return
+            end
+            if utils.run_cmd_sync(cmd).code ~= 0 then
+                vim.notify(prefix .. ": custom build failed for " .. lang, vim.log.levels.ERROR)
+                return
+            end
+        elseif ntl.languages[lang]["parsers"] then
+            for _, parser in ipairs(ntl.languages[lang]["parsers"]) do
+                local parser_name = parser["parser"]
+                local repo_path = tmp .. "/" .. parser["subpath"] .. "/src"
+                install_parser(repo_path, parser_name)
             end
         else
-            local url = (ntl.config.special_language_urls[lang] and
-                ntl.config.special_language_urls[lang] or
-                "https://github.com/tree-sitter/tree-sitter-" .. lang
-            )
-            if not clone_git_repo(url, tmp, prefix) then return end
             install_parser(tmp .. "/src", lang)
         end
+
     end)
 
     -- always delete temporary file
@@ -299,13 +319,13 @@ local function ts_uninstall(lang, prefix)
     local missing_paths = {}
 
     for _, path in ipairs(paths) do
-        local pname = get_pname_from_parser_path(path)
+        local parser = get_parser_from_parser_path(path)
         if file_exists(path) then
             if vim.fn.delete(path) ~= 0 then
-                vim.notify(prefix .. ": error deleting parser " .. pname .. " (path '" .. path .. "')", vim.log.levels.ERROR)
+                vim.notify(prefix .. ": error deleting parser " .. parser .. " (path '" .. path .. "')", vim.log.levels.ERROR)
             end
         else
-            table.insert(missing_paths, { path = path, pname = pname })
+            table.insert(missing_paths, { path = path, parser = parser })
         end
     end
 
@@ -314,17 +334,17 @@ local function ts_uninstall(lang, prefix)
     elseif #missing_paths == #paths then
         vim.notify(prefix .. ": couldn't uninstall any parser linked to the language " .. lang, vim.log.levels.ERROR)
     else
-        local msg_pnames = ""
+        local msg_parsers = ""
         local msg_paths = ""
         for i, pair in ipairs(missing_paths) do
-            msg_pnames = msg_pnames .. pair["pname"]
+            msg_parsers = msg_parsers .. pair["parser"]
             msg_paths = msg_paths .. "'" .. pair["path"] .. "'"
             if i < #missing_paths then
-                msg_pnames = msg_pnames .. ", "
+                msg_parsers = msg_parsers .. ", "
                 msg_paths = msg_paths .. ", "
             end
         end
-        vim.notify(prefix .. ": couldn't uninstall parsers " .. msg_pnames .. " in paths " .. msg_paths, vim.log.levels.ERROR)
+        vim.notify(prefix .. ": couldn't uninstall parsers " .. msg_parsers .. " in paths " .. msg_paths, vim.log.levels.ERROR)
     end
 end
 
@@ -351,8 +371,8 @@ local function ts_update_all()
 
     local langs_to_update = {}
     for _, path in ipairs(parser_files) do
-        local pname = get_pname_from_parser_path(path)
-        local lang = get_lang_from_pname(pname)
+        local parser = get_parser_from_parser_path(path)
+        local lang = get_lang_from_parser(parser)
         langs_to_update[lang] = true
     end
 
@@ -361,12 +381,12 @@ local function ts_update_all()
     end
 end
 
----Get all installed pnames
+---Get all installed parsers
 ---@return string[]
-local function get_installed_pnames()
+local function get_installed_parsers()
     local parser_files = vim.fn.glob(parser_dir .. "/*.so", false, true)
     for i, _ in ipairs(parser_files) do
-        parser_files[i] = get_pname_from_parser_path(parser_files[i])
+        parser_files[i] = get_parser_from_parser_path(parser_files[i])
     end
     return parser_files
 end
@@ -374,11 +394,11 @@ end
 ---Get all installed language parsers
 ---@return string[]
 local function get_installed_languages()
-    local pnames = get_installed_pnames()
+    local parsers = get_installed_parsers()
 
     local langs_set = {}
-    for _, pname in ipairs(pnames) do
-        local lang = get_lang_from_pname(pname)
+    for _, parser in ipairs(parsers) do
+        local lang = get_lang_from_parser(parser)
         langs_set[lang] = true
     end
 

@@ -96,10 +96,27 @@ local function get_c_comp_path()
     end
 end
 
+---Parse git repo url. If url doesn't begin with http, github will be prepended
+---@param url string
+---@return string
+local function git_repo_url(url)
+    local prefix = "http"
+    if url:sub(1, #prefix) == prefix then
+        return url
+    end
+    
+    local github_url = "https://github.com"
+    if url:sub(1, 1) ~= "/" then
+        github_url = github_url .. "/"
+    end
+    return github_url .. url
+end
+
 return {
     run_cmd_sync = run_cmd_sync,
     get_basename = get_basename,
     get_cpp_comp_path = get_cpp_comp_path,
     get_c_comp_path = get_c_comp_path,
+    git_repo_url = git_repo_url,
 }
 
