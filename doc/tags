@@ -1,0 +1,13 @@
+:TSInfo	treesitter-lite.txt	/*:TSInfo*
+:TSInstall	treesitter-lite.txt	/*:TSInstall*
+:TSUninstall	treesitter-lite.txt	/*:TSUninstall*
+:TSUpdate	treesitter-lite.txt	/*:TSUpdate*
+treesitter-lite-commands	treesitter-lite.txt	/*treesitter-lite-commands*
+treesitter-lite-config	treesitter-lite.txt	/*treesitter-lite-config*
+treesitter-lite-config-special_language_urls	treesitter-lite.txt	/*treesitter-lite-config-special_language_urls*
+treesitter-lite-config-special_languages	treesitter-lite.txt	/*treesitter-lite-config-special_languages*
+treesitter-lite-contents	treesitter-lite.txt	/*treesitter-lite-contents*
+treesitter-lite-installation	treesitter-lite.txt	/*treesitter-lite-installation*
+treesitter-lite-intro	treesitter-lite.txt	/*treesitter-lite-intro*
+treesitter-lite-requirements	treesitter-lite.txt	/*treesitter-lite-requirements*
+treesitter-lite.txt	treesitter-lite.txt	/*treesitter-lite.txt*

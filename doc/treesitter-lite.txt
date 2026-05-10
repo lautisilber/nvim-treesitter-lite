@@ -1,0 +1,114 @@
+*treesitter-lite.txt*    Lightweight tree-sitter parser manager
+
+==============================================================================
+CONTENTS                                             *treesitter-lite-contents*
+
+  1. Introduction ................................ |treesitter-lite-intro|
+  2. Requirements ................................ |treesitter-lite-requirements|
+  3. Installation ................................ |treesitter-lite-installation|
+  4. Configuration ............................... |treesitter-lite-config|
+  5. Commands .................................... |treesitter-lite-commands|
+
+==============================================================================
+1. INTRODUCTION                                         *treesitter-lite-intro*
+
+nvim-treesitter-lite is a lightweight plugin for managing tree-sitter parsers.
+It installs, uninstalls, and updates parsers by cloning their repositories and
+compiling them locally, without the overhead of nvim-treesitter.
+
+Parsers are saved to `{stdpath("data")}/site/parser/`, which is on Neovim's
+default runtime path. Neovim's built-in tree-sitter integration picks them up
+from there automatically.
+
+==============================================================================
+2. REQUIREMENTS                                   *treesitter-lite-requirements*
+
+- Neovim 0.10+
+- git
+- A C compiler (cc, gcc, or clang)
+- A C++ compiler (c++, g++, or clang++) — only for parsers with a C++ scanner
+
+==============================================================================
+3. INSTALLATION                                   *treesitter-lite-installation*
+
+lazy.nvim ~
+>lua
+    { "username/nvim-treesitter-lite" }
+<
+
+packer.nvim ~
+>lua
+    use { "username/nvim-treesitter-lite" }
+<
+
+Manual ~
+>lua
+    vim.opt.runtimepath:append("~/path/to/nvim-treesitter-lite")
+<
+
+==============================================================================
+4. CONFIGURATION                                        *treesitter-lite-config*
+
+Call `setup()` with a table to override the defaults. All keys are optional.
+>lua
+    require("nvim-treesitter-lite").setup({
+        special_languages     = { ... },
+        special_language_urls = { ... },
+    })
+<
+
+                                      *treesitter-lite-config-special_languages*
+special_languages ~
+
+Languages that have multiple parsers or a non-standard repository layout.
+Each entry requires a `url` and a list of `{ subpath, pname }` pairs.
+
+Default: `{ typescript = { ... } }`
+>lua
+    special_languages = {
+        typescript = {
+            url = "https://github.com/tree-sitter/tree-sitter-typescript",
+            pnames = {
+                { subpath = "typescript", pname = "typescript" },
+                { subpath = "tsx",        pname = "tsx" },
+            },
+        },
+    },
+<
+
+                                  *treesitter-lite-config-special_language_urls*
+special_language_urls ~
+
+Languages whose repository URL does not follow the standard pattern
+`https://github.com/tree-sitter/tree-sitter-<lang>`.
+
+Default: `{}`
+>lua
+    special_language_urls = {
+        blade = "https://github.com/EmranMR/tree-sitter-blade",
+    },
+<
+
+==============================================================================
+5. COMMANDS                                           *treesitter-lite-commands*
+
+                                                                  *:TSInstall*
+:TSInstall {lang}
+    Install the parser for {lang}. The language name is case-insensitive.
+    Parsers are cloned from GitHub and compiled locally.
+
+                                                                *:TSUninstall*
+:TSUninstall [{lang} ...]
+    Uninstall the parser(s) associated with each {lang}.
+
+                                                                   *:TSUpdate*
+:TSUpdate [{lang} ...]
+    Update one or more parsers by uninstalling and reinstalling them.
+    If no argument is given, all installed parsers are updated.
+
+                                                                     *:TSInfo*
+:TSInfo
+    Print a list of all currently installed languages.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

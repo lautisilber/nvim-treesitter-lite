@@ -17,14 +17,6 @@ M.config = {
         }
     },
     special_language_urls = {},
-    bundled_languages = {
-        [ "c" ] = true,
-        [ "lua" ] = true,
-        [ "markdown" ] = true,
-        [ "vimscript" ] = true,
-        [ "vimdoc" ] = true,
-        [ "query" ] = true, -- tree-sitter query files
-    };
 }
 
 function M.setup(user_config)
