@@ -130,14 +130,23 @@ end
 ---Clones a git repo to a temporary file
 ---@param url string
 ---@param tmp string
+---@param prefix string
+---@param tag string?
 ---@return boolean
-local function clone_git_repo(url, tmp, prefix)
+local function clone_git_repo(url, tmp, prefix, tag)
     vim.notify(prefix .. ": cloning " .. url, vim.log.levels.INFO)
 
     local res = utils.run_cmd_sync({ "git", "clone", "--depth=1", url, tmp })
     if res.code ~= 0 then
         vim.notify(prefix .. ": couldn't clone git repository \"" .. url .. "\" with error: " .. res.stderr)
         return false
+    end
+    if tag ~= nil then
+       res = utils.run_cmd_sync({ "git", "fetch", "--all", "--tags", "--prune", "&&", "git", "checkout", tag })
+       if res.code ~= 0 then
+           vim.notify(prefix .. ": couldn't checkout to tag " .. tag .. " with error: " .. res.stderr)
+           return false
+       end
     end
     return true
 end
@@ -274,8 +283,9 @@ local function ts_install(lang, prefix)
     -- from here on, we can't crash, since we need to remove the tmp file
     local tmp = vim.fn.tempname()
     local ok, err = pcall(function ()
+        print(ntl.languages[lang])
         local url = utils.git_repo_url(ntl.languages[lang]["url"])
-        if not clone_git_repo(url, tmp, prefix) then return end
+        if not clone_git_repo(url, tmp, prefix, ntl.languages[lang]["tag"]) then return end
 
         if ntl.languages[lang].build ~= nil then
             local cmd = ntl.languages[lang].build(utils, tmp, parser_dir)
@@ -410,6 +420,17 @@ local function get_installed_languages()
     return langs
 end
 
+---Lists all available languages
+---@return string[]
+local function ts_list()
+    local langs = {}
+    for lang, _ in pairs(ntl.languages) do
+        table.insert(langs, lang)
+    end
+    table.sort(langs)
+    return langs
+end
+
 
 return {
     ts_install = ts_install,
@@ -417,4 +438,5 @@ return {
     ts_update_single = ts_update_single,
     ts_update_all = ts_update_all,
     get_installed_languages = get_installed_languages,
+    ts_list = ts_list,
 }
