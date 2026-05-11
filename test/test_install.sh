@@ -3,7 +3,7 @@
 trap 'echo ""; echo "Interrupted"; kill $(jobs -p) 2>/dev/null; exit 130' INT
 
 usage() {
-    echo "Usage: $(basename "$0") [-n <jobs>] [-t <seconds>] [-h]"
+    echo "Usage: $(basename "$0") [-t <seconds>] [-h]"
     echo ""
     echo "Options:"
     echo "  -t <seconds> Timeout per language in seconds (default: 30)"
@@ -23,13 +23,16 @@ done
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PARSER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/parser"
 FAILED=()
-pids=()
-langs=()
 
+echo "Test TSInstall"
 echo "PARSER_DIR: $PARSER_DIR"
 rm -f "$PARSER_DIR"/*.so
 
-compile_lang() {
+get_languages() {
+    LUA_PATH="$SCRIPT_DIR/../lua/nvim-treesitter-lite/?.lua;;" lua "$SCRIPT_DIR/get_parsers.lua"
+}
+
+install_lang() {
     local lang="${1}"
 
     # Important to add </dev/null to the nvim command, because otherwise it will
@@ -47,7 +50,7 @@ while IFS= read -r line; do
     lang="${parts[0]}"
     parsers=("${parts[@]:1}")
 
-    compile_lang "$lang"
+    install_lang "$lang"
 
     lang_failed=false
     for parser in "${parsers[@]}"; do
@@ -63,7 +66,7 @@ while IFS= read -r line; do
         FAILED+=("$lang")
     fi
 
-done < <(LUA_PATH="$SCRIPT_DIR/../lua/nvim-treesitter-lite/?.lua;;" lua "$SCRIPT_DIR/get_parsers.lua")
+done < <(source "${SCRIPT_DIR}/utils/languages2bash.sh")
 
 if [ ${#FAILED[@]} -ne 0 ]; then
     echo ""
