@@ -100,6 +100,9 @@ return {
     zsh = { url = "tree-sitter-grammars/tree-sitter-zsh" },
     ispc = { url = "tree-sitter-grammars/tree-sitter-ispc" },
     move = { url = "tree-sitter-grammars/tree-sitter-move" },
+    vb_dotnet = { url = "CodeAnt-AI/tree-sitter-vb-dotnet" },
+    fortran = { url = "stadelmanma/tree-sitter-fortran" },
+    ada = { url = "briot/tree-sitter-ada" },
 
     -- tier 2
     typescript = {
@@ -107,11 +110,11 @@ return {
         parsers = {
             {
                 subpath = "typescript",
-                parser = "typescript",
+                name = "typescript",
             },
             {
                 subpath = "tsx",
-                parser = "tsx",
+                name = "tsx",
             },
         }
     },
@@ -120,7 +123,7 @@ return {
         parsers = {
             {
                 subpath = "php",
-                parser = "php"
+                name = "php"
             }
         },
     },
@@ -129,7 +132,7 @@ return {
         parsers = {
             {
                 subpath = "xml",
-                parser = "xml",
+                name = "xml",
             },
         },
     },
@@ -138,18 +141,35 @@ return {
         parsers = {
             {
                 subpath = "csv",
-                parser = "csv",
+                name = "csv",
             },
             {
                 subpath = "psv",
-                parser = "psv",
+                name = "psv",
             },
             {
                 subpath = "tsv",
-                parser = "tsv",
+                name = "tsv",
             },
         },
-    }
+    },
+    ocaml = {
+        url = "tree-sitter/tree-sitter-ocaml",
+        parsers = {
+            {
+                subpath = "grammars/ocaml",
+                name = "ocaml",
+            },
+            {
+                subpath = "grammars/interface",
+                name = "ocaml_interface",
+            },
+            {
+                subpath = "grammars/type",
+                name = "ocaml_type"
+            },
+        },
+    },
 
     -- tier 3
     -- yaml = "tree-sitter-grammars/tree-sitter-yaml",

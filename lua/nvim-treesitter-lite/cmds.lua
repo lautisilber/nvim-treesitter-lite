@@ -33,10 +33,10 @@ end
 ---@return string[]
 local function get_parsers_from_lang(lang)
     local lang_def = ntl.languages[lang]
-    if lang_def ~= nil and lang_def["parsers"] ~= nil then -- tier 2 or 3
+    if lang_def ~= nil and lang_def.parsers ~= nil then -- tier 2 or 3
         local parsers = {}
-        for _, p in ipairs(lang_def["parsers"]) do
-            table.insert(parsers, p["parser"])
+        for _, p in ipairs(lang_def.parsers) do
+            table.insert(parsers, p.name)
         end
         return parsers
     end
@@ -48,9 +48,9 @@ end
 ---@return string
 local function get_lang_from_parser(parser)
     for lang, obj in pairs(ntl.languages) do
-        if obj["parsers"] ~= nil then -- tier 2 or tier 3
-            for _, p in ipairs(obj["parsers"]) do
-                if parser == p["parser"] then
+        if obj.parsers ~= nil then -- tier 2 or tier 3
+            for _, p in ipairs(obj.parsers) do
+                if parser == p.name then
                     return lang
                 end
             end
@@ -266,7 +266,10 @@ local function ts_install(lang, prefix)
 
         else
             -- we only have c files
-            local sources = { parser_c }
+            local sources = {}
+            if file_exists(parser_c) then
+                table.insert(sources, parser_c)
+            end
             if file_exists(scanner_c) then
                 table.insert(sources, scanner_c)
             end
@@ -296,10 +299,10 @@ local function ts_install(lang, prefix)
                 vim.notify(prefix .. ": custom build failed for " .. lang, vim.log.levels.ERROR)
                 return
             end
-        elseif ntl.languages[lang]["parsers"] then
-            for _, parser in ipairs(ntl.languages[lang]["parsers"]) do
-                local parser_name = parser["parser"]
-                local repo_path = tmp .. "/" .. parser["subpath"] .. "/src"
+        elseif ntl.languages[lang].parsers then
+            for _, parser in ipairs(ntl.languages[lang].parsers) do
+                local parser_name = parser.name
+                local repo_path = tmp .. "/" .. parser.subpath .. "/src"
                 install_parser(repo_path, parser_name)
             end
         else
@@ -346,7 +349,7 @@ local function ts_uninstall(lang, prefix)
         local msg_parsers = ""
         local msg_paths = ""
         for i, pair in ipairs(missing_paths) do
-            msg_parsers = msg_parsers .. pair["parser"]
+            msg_parsers = msg_parsers .. pair.name
             msg_paths = msg_paths .. "'" .. pair["path"] .. "'"
             if i < #missing_paths then
                 msg_parsers = msg_parsers .. ", "
