@@ -100,6 +100,8 @@ Installation clones the parser's repository to a temporary directory, compiles t
 
 ## TODO
 
+- Add queries! (parsers are compiled and installed, but we still need to install the queries)
+- Keep all parser intermediate compilation files in the tmp dir, instead of the parser_dir, so if it fails, the intermediate files are deleted
 - Add a way for languages to track specific tags rather than just the latest main
 
 ## License
