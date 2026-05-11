@@ -6,8 +6,6 @@
 -- All languages and parsers are cast to lowercase
 
 local utils = require("nvim-treesitter-lite.utils")
-local ntl = require("nvim-treesitter-lite")
-
 
 local bundled_languages = {
     [ "c" ] = true,
