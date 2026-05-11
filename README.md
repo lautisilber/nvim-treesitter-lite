@@ -98,6 +98,10 @@ Parsers are compiled from source and saved to `{stdpath("data")}/site/parser/`, 
 
 Installation clones the parser's repository to a temporary directory, compiles the sources with the system C/C++ compiler, copies the resulting `.so` to the parser directory, and cleans up the temporary directory.
 
+## TODO
+
+- Add a way for languages to track specific tags rather than just the latest main
+
 ## License
 
 MIT
