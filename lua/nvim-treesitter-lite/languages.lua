@@ -103,6 +103,7 @@ return {
     vb_dotnet = { url = "CodeAnt-AI/tree-sitter-vb-dotnet" },
     fortran = { url = "stadelmanma/tree-sitter-fortran" },
     ada = { url = "briot/tree-sitter-ada" },
+    cmake = { url = "uyha/tree-sitter-cmake" },
 
     -- tier 2
     typescript = {
