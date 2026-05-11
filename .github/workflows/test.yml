@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y gcc g++ git
+
+      - name: Install Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: stable
+
+      - name: Test TSInstall
+        run: bash test/test_install.sh
+
+      - name: Test TSUninstall
+        run: bash test/test_uninstall.sh
+
+      - name: Test TSUpdate
+        run: bash test/test_update.sh
