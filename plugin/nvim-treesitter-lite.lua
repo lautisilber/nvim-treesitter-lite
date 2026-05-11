@@ -39,3 +39,17 @@ vim.api.nvim_create_user_command("TSInfo", function (opts)
 
     vim.notify("TSInfo: installed languages are\n" .. langs_str, vim.log.levels.INFO)
 end, { nargs = 0 })
+
+vim.api.nvim_create_user_command("TSList", function (opts)
+    local langs = cmds.ts_list()
+    local langs_str = ""
+
+    for i, lang in ipairs(langs) do
+        langs_str = langs_str .. " - " .. lang
+        if i < #langs then
+            langs_str = langs_str .. "\n"
+        end
+    end
+
+    vim.notify("TSList: available languages\n" .. langs_str, vim.log.levels.INFO)
+end, { nargs = 0 })

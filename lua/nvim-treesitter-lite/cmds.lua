@@ -283,7 +283,6 @@ local function ts_install(lang, prefix)
     -- from here on, we can't crash, since we need to remove the tmp file
     local tmp = vim.fn.tempname()
     local ok, err = pcall(function ()
-        print(ntl.languages[lang])
         local url = utils.git_repo_url(ntl.languages[lang]["url"])
         if not clone_git_repo(url, tmp, prefix, ntl.languages[lang]["tag"]) then return end
 
