@@ -24,15 +24,26 @@ vim.api.nvim_create_user_command("TSUninstall", function (opts)
     end
 end, {
     nargs = "+",
-    complete = function(arglead)
+    complete = function(arglead, cmdline)
         local function escape_pattern(s)
             return s:gsub("([%-%.%+%[%]%(%)%$%^%%%?%*])", "%%%1")
         end
 
         local installed = cmds.get_installed_languages()
+
+        -- parse already-typed languages from the cmdline
+        -- cmdline looks like "TSUninstall python typescript ..."
+        local already_typed = {}
+        for word in cmdline:gmatch("%S+") do
+            already_typed[word] = true
+        end
+        -- remove the command name itself
+        already_typed["TSUninstall"] = nil
+
         local matches = {}
         for _, lang in ipairs(installed) do
-            if lang:find("^" .. escape_pattern(arglead)) then
+            if lang:find("^" .. escape_pattern(arglead))
+                and not already_typed[lang] then
                 table.insert(matches, lang)
             end
         end
