@@ -66,7 +66,7 @@ while IFS= read -r line; do
         FAILED+=("$lang")
     fi
 
-done < <(source "${SCRIPT_DIR}/utils/languages2bash.sh")
+done < <(get_languages)
 
 if [ ${#FAILED[@]} -ne 0 ]; then
     echo ""
@@ -76,3 +76,4 @@ else
     echo ""
     echo "All languages passed"
 fi
+

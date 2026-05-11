@@ -106,3 +106,4 @@ else
     echo ""
     echo "All languages passed"
 fi
+
