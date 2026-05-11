@@ -3,7 +3,20 @@ local cmds = require("nvim-treesitter-lite.cmds")
 vim.api.nvim_create_user_command("TSInstall", function (opts)
     local lang = opts.args:lower()
     cmds.ts_install(lang)
-end, { nargs = 1 })
+end, {
+    nargs = 1,
+    complete = function(arglead)
+        local languages = require("nvim-treesitter-lite").languages
+        local matches = {}
+        for lang, _ in pairs(languages) do
+            if lang:find("^" .. arglead) then
+                table.insert(matches, lang)
+            end
+        end
+        table.sort(matches)
+        return matches
+    end,
+})
 
 vim.api.nvim_create_user_command("TSUninstall", function (opts)
     if opts.args == "" then

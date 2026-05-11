@@ -8,6 +8,7 @@
 local utils = require("nvim-treesitter-lite.utils")
 local ntl = require("nvim-treesitter-lite")
 
+
 local bundled_languages = {
     [ "c" ] = true,
     [ "lua" ] = true,
@@ -32,7 +33,7 @@ end
 ---@param lang string
 ---@return string[]
 local function get_parsers_from_lang(lang)
-    local lang_def = ntl.languages[lang]
+    local lang_def = require("nvim-treesitter-lite").languages[lang]
     if lang_def ~= nil and lang_def.parsers ~= nil then -- tier 2 or 3
         local parsers = {}
         for _, p in ipairs(lang_def.parsers) do
@@ -47,7 +48,7 @@ end
 ---@param parser string
 ---@return string
 local function get_lang_from_parser(parser)
-    for lang, obj in pairs(ntl.languages) do
+    for lang, obj in pairs(require("nvim-treesitter-lite").languages) do
         if obj.parsers ~= nil then -- tier 2 or tier 3
             for _, p in ipairs(obj.parsers) do
                 if parser == p.name then
@@ -168,7 +169,7 @@ local function ts_install(lang, prefix)
         return
     end
 
-    if ntl.languages[lang] == nil then
+    if require("nvim-treesitter-lite").languages[lang] == nil then
         vim.notify(prefix .. ": language '" .. lang .. "' is not supported", vim.log.levels.ERROR)
         return
     end
@@ -286,11 +287,11 @@ local function ts_install(lang, prefix)
     -- from here on, we can't crash, since we need to remove the tmp file
     local tmp = vim.fn.tempname()
     local ok, err = pcall(function ()
-        local url = utils.git_repo_url(ntl.languages[lang]["url"])
-        if not clone_git_repo(url, tmp, prefix, ntl.languages[lang]["tag"]) then return end
+        local url = utils.git_repo_url(require("nvim-treesitter-lite").languages[lang]["url"])
+        if not clone_git_repo(url, tmp, prefix, require("nvim-treesitter-lite").languages[lang]["tag"]) then return end
 
-        if ntl.languages[lang].build ~= nil then
-            local cmd = ntl.languages[lang].build(utils, tmp, parser_dir)
+        if require("nvim-treesitter-lite").languages[lang].build ~= nil then
+            local cmd = require("nvim-treesitter-lite").languages[lang].build(utils, tmp, parser_dir)
             if cmd == nil then
                 vim.notify(prefix .. ": failed to create custom build command for " .. lang, vim.log.levels.ERROR)
                 return
@@ -299,8 +300,8 @@ local function ts_install(lang, prefix)
                 vim.notify(prefix .. ": custom build failed for " .. lang, vim.log.levels.ERROR)
                 return
             end
-        elseif ntl.languages[lang].parsers then
-            for _, parser in ipairs(ntl.languages[lang].parsers) do
+        elseif require("nvim-treesitter-lite").languages[lang].parsers then
+            for _, parser in ipairs(require("nvim-treesitter-lite").languages[lang].parsers) do
                 local parser_name = parser.name
                 local repo_path = tmp .. "/" .. parser.subpath .. "/src"
                 install_parser(repo_path, parser_name)
@@ -426,7 +427,7 @@ end
 ---@return string[]
 local function ts_list()
     local langs = {}
-    for lang, _ in pairs(ntl.languages) do
+    for lang, _ in pairs(require("nvim-treesitter-lite").languages) do
         table.insert(langs, lang)
     end
     table.sort(langs)
