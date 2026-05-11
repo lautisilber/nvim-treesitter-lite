@@ -19,14 +19,27 @@ end, {
 })
 
 vim.api.nvim_create_user_command("TSUninstall", function (opts)
-    if opts.args == "" then
-        vim.notify("TSUninstall: at least one argument is required", vim.log.levels.ERROR)
-        return
-    end
     for lang in opts.args:gmatch("%S+") do
         cmds.ts_uninstall(lang:lower())
     end
-end, { nargs = "?" })
+end, {
+    nargs = "+",
+    complete = function(arglead)
+        local function escape_pattern(s)
+            return s:gsub("([%-%.%+%[%]%(%)%$%^%%%?%*])", "%%%1")
+        end
+
+        local installed = cmds.get_installed_languages()
+        local matches = {}
+        for _, lang in ipairs(installed) do
+            if lang:find("^" .. escape_pattern(arglead)) then
+                table.insert(matches, lang)
+            end
+        end
+        table.sort(matches)
+        return matches
+    end,
+})
 
 vim.api.nvim_create_user_command("TSUpdate", function (opts)
     if opts.args == "" then
