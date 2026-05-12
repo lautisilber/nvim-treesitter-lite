@@ -70,6 +70,11 @@ end, {
 
 vim.api.nvim_create_user_command("TSInfo", function ()
     local langs = cmds.get_installed_languages()
+    if #langs == 0 then
+        vim.notify("TSList: no languages installed", vim.log.levels.INFO)
+        return
+    end
+
     local langs_str = ""
 
     for i, lang in ipairs(langs) do
