@@ -83,6 +83,12 @@ while IFS= read -r line; do
     parsers_str="${parts[1]}"
     queries_str="${parts[2]}"
 
+    # I know python has queries. We'll use it to test that queries are installed
+    # if the git repo has a "queries" folder with .scm files in it
+    if [[ "$lang" == "python" && -z "$queries_str" ]]; then
+        queries_str="python"
+    fi
+
     echo "Testing: $lang"
     install_lang "$lang"
 
