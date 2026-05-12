@@ -104,6 +104,7 @@ return {
     fortran = { url = "stadelmanma/tree-sitter-fortran" },
     ada = { url = "briot/tree-sitter-ada" },
     cmake = { url = "uyha/tree-sitter-cmake" },
+    yaml = { url = "ikatyang/tree-sitter-yaml" },
 
     -- tier 2
     typescript = {
@@ -117,7 +118,18 @@ return {
                 subpath = "tsx",
                 name = "tsx",
             },
-        }
+        },
+        queries = {
+            {
+                subpath = "queries",
+                name = "typescript"
+            },
+            {
+                -- both typescript and tsx get the same queries from the same subpath
+                subpath = "queries",
+                name = "tsx",
+            },
+        },
     },
     php = {
         url = "tree-sitter/tree-sitter-php",
@@ -125,7 +137,13 @@ return {
             {
                 subpath = "php",
                 name = "php"
-            }
+            },
+        },
+        queries = {
+            {
+                subpath = "queries",
+                name = "php",
+            },
         },
     },
     xml = {
@@ -134,6 +152,28 @@ return {
             {
                 subpath = "xml",
                 name = "xml",
+            },
+        },
+        queries = {
+            {
+                subpath = "queries/xml",
+                name = "xml",
+            },
+        },
+    },
+    dtd = {
+        -- dtd exists in xml
+        url = "tree-sitter-grammars/tree-sitter-xml",
+        parsers = {
+            {
+                subpath = "dtd",
+                name = "dtd",
+            },
+        },
+        queries = {
+            {
+                subpath = "queries/dtd",
+                name = "dtd",
             },
         },
     },
@@ -153,6 +193,20 @@ return {
                 name = "tsv",
             },
         },
+        queries = {
+            {
+                subpath = "csv/queries",
+                name = "csv",
+            },
+            {
+                subpath = "psv/queries",
+                name = "psv",
+            },
+            {
+                subpath = "tsv/queries",
+                name = "tsv",
+            },
+        },
     },
     ocaml = {
         url = "tree-sitter/tree-sitter-ocaml",
@@ -168,6 +222,20 @@ return {
             {
                 subpath = "grammars/type",
                 name = "ocaml_type"
+            },
+        },
+        queries = {
+            {
+                subpath = "queries",
+                name = "ocaml",
+            },
+            {
+                subpath = "queries",
+                name = "ocaml_interface",
+            },
+            {
+                subpath = "queries",
+                name = "ocaml_type",
             },
         },
     },

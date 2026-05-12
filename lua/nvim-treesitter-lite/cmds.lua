@@ -63,19 +63,18 @@ end
 
 ---Get the path to the queries directory from the lang
 ---@param lang string
----@return string
-local function get_querires_path_from_lang(lang)
-    return queries_dir .. "/" .. lang
+---@return string[]
+local function get_queries_paths_from_lang(lang)
+    if require("nvim-treesitter-lite").languages[lang].queries ~= nil then
+        local paths = {}
+        for _, query in ipairs(require("nvim-treesitter-lite").languages[lang].queries) do
+            table.insert(queries_dir .. "/" .. query.name)
+        end
+        return paths
+    end
+    return { queries_dir .. "/" .. lang }
 end
 
-
----Get the path to the queries directory from the parser
----@param parser string
----@return string
-local function get_queries_path_from_parser(parser)
-    local lang = get_lang_from_parser(parser)
-    return get_querires_path_from_lang(lang)
-end
 
 ---Get all parser paths associated with a language
 ---@param lang string
@@ -298,22 +297,38 @@ local function ts_install(lang, prefix)
             end
         end
 
-        vim.notify(prefix .. ": installed " .. parser, vim.log.levels.INFO)
+        vim.notify(prefix .. ": installed " .. parser .. " parser", vim.log.levels.INFO)
         return true
     end
 
-    local function install_queries(queries_src_path)
+    local function install_queries(repo_path)
         local function copy(src_file, dst_dir)
             -- TODO: check if this function has an error
             ensure_dir(dst_dir)
             local filename = utils.get_basename(src_file)
             vim.fn.writefile(vim.fn.readfile(src_file), dst_dir .. "/" .. filename)
         end
-        local queries_dest = get_querires_path_from_lang(lang)
-        local queries_src = vim.fn.glob(queries_src_path .. "/*.scm", false, true)
-        for _, query_file in ipairs(queries_src) do
-            copy(query_file, queries_dest)
+
+        if require("nvim-treesitter-lite").languages[lang].queries ~= nil then
+            for _, query in ipairs(require("nvim-treesitter-lite").languages[lang].queries) do
+                local name = query.name
+                local query_dest = queries_dir .. "/" .. name
+                local subpath = query.subpath
+                local queries_src = vim.fn.glob(repo_path .. "/" .. subpath .. "/*.scm", false, true)
+                for _, query_file in ipairs(queries_src) do
+                    copy(query_file, query_dest)
+                end
+                vim.notify(prefix ..": installed " .. name .. " queries", vim.log.levels.INFO)
+            end
+        else
+            local query_dest = queries_dir .. "/" .. lang
+            local queries_src = vim.fn.glob(repo_path .. "/queries/*.scm", false, true)
+            for _, query_file in ipairs(queries_src) do
+                copy(query_file, query_dest)
+            end
+            vim.notify(prefix ..": installed " .. lang .. " queries", vim.log.levels.INFO)
         end
+        return true
     end
 
     -- from here on, we can't crash, since we need to remove the tmp file
@@ -345,13 +360,7 @@ local function ts_install(lang, prefix)
         end
 
         -- install queries
-        local queries_subpath = (
-            require("nvim-treesitter-lite").languages[lang].queries ~= nil and
-            require("nvim-treesitter-lite").languages[lang].queries or
-            "queries"
-        )
-        install_queries(tmp .. "/" .. queries_subpath)
-        return true
+        return install_queries(tmp)
     end)
 
     -- always delete temporary file
@@ -411,24 +420,26 @@ local function ts_uninstall(lang, prefix)
     end
 
     -- uninstall queries
-    local queries_path = get_querires_path_from_lang(lang)
-    if dir_exists(queries_path) then
-        local n_queries = #vim.fn.glob(queries_path .. "/*.scm", false, true)
-        local success = vim.fn.delete(queries_path, "rf") == 0
-        if success then
-            if n_queries >= 1 then
-                vim.notify(prefix .. ": uninstalled " .. lang .. (n_queries > 1 and " queries" or " query"), vim.log.levels.INFO)
+    local info_level = res and vim.log.levels.INFO or vim.log.levels.ERROR
+    local queries_paths = get_queries_paths_from_lang(lang)
+    for _, queries_path in ipairs(queries_paths) do
+        if dir_exists(queries_path) then
+            local n_queries = #vim.fn.glob(queries_path .. "/*.scm", false, true)
+            local success = vim.fn.delete(queries_path, "rf") == 0
+            if success then
+                if n_queries >= 1 then
+                    vim.notify(prefix .. ": uninstalled " .. lang .. (n_queries > 1 and " queries" or " query"), info_level)
+                else
+                    vim.notify(prefix .. ": no queries were installed for " .. lang, info_level)
+                end
             else
-                vim.notify(prefix .. ": no queries were installed for " .. lang, vim.log.levels.INFO)
+                vim.notify(prefix .. ": failed to uninstall " .. lang .. (n_queries > 1 and " queries" or " query"), vim.log.levels.ERROR)
+                res = false
             end
         else
-            vim.notify(prefix .. ": failed to uninstall " .. lang .. (n_queries > 1 and " queries" or " query"), vim.log.levels.ERROR)
-            res = false
+            vim.notify(prefix .. ": no queries were installed for " .. lang, info_level)
         end
-    else
-        vim.notify(prefix .. ": no queries were installed for " .. lang, vim.log.levels.INFO)
     end
-
     return res
 end
 
