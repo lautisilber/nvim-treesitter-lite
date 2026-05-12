@@ -196,7 +196,7 @@ local function ts_install(lang, prefix)
     local function install_parser(repo_path, parser)
         local out = get_parser_path_from_parser(parser)
 
-        local c_comp = utils.get_c_comp_path()
+        local c_comp = utils.get_c_comp_path() .. "-std=c11"
         if c_comp == nil then
             vim.notify(prefix .. ": couldn't find a c compiler", vim.log.levels.ERROR)
             return false
