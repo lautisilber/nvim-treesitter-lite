@@ -14,10 +14,10 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get install -y gcc g++ git lua5.4
 
-        name: Set default compiler to gcc
+      - name: Set default compiler to gcc
         run: |
           sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100
-          sudo update-alternatives --set cc /usr/bin/gccA
+          sudo update-alternatives --set cc /usr/bin/gcc
           sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
           sudo update-alternatives --set c++ /usr/bin/g++
 
