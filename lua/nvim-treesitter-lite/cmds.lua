@@ -68,7 +68,7 @@ local function get_queries_paths_from_lang(lang)
     if require("nvim-treesitter-lite").languages[lang].queries ~= nil then
         local paths = {}
         for _, query in ipairs(require("nvim-treesitter-lite").languages[lang].queries) do
-            table.insert(queries_dir .. "/" .. query.name)
+            table.insert(paths, queries_dir .. "/" .. query.name)
         end
         return paths
     end
