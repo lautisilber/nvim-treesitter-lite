@@ -196,7 +196,7 @@ local function ts_install(lang, prefix)
     local function install_parser(repo_path, parser)
         local out = get_parser_path_from_parser(parser)
 
-        local c_comp = utils.get_c_comp_path() .. "-std=c11"
+        local c_comp = utils.get_c_comp_path()
         if c_comp == nil then
             vim.notify(prefix .. ": couldn't find a c compiler", vim.log.levels.ERROR)
             return false
@@ -210,8 +210,9 @@ local function ts_install(lang, prefix)
         ---@param shared boolean
         ---@param no_link boolean
         ---@param stdlibpp boolean
+        ---@param c11 boolean
         ---@return string[]
-        local function get_comp_cmd(comp, out, includes, sources, shared, no_link, stdlibpp)
+        local function get_comp_cmd(comp, out, includes, sources, shared, no_link, stdlibpp, c11)
             local cmd = {
                 comp,
                 "-fPIC",
@@ -233,6 +234,10 @@ local function ts_install(lang, prefix)
 
             if no_link then
                 table.insert(cmd, "-c")
+            end
+
+            if c11 then
+                table.insert(cmd, "-std=c11")
             end
 
             for _, source_path in ipairs(sources) do
@@ -265,19 +270,19 @@ local function ts_install(lang, prefix)
             local scanner_o = repo_path .. "/scanner.o"
 
             -- compile parser
-            local comp_parser = get_comp_cmd(c_comp, parser_o, { repo_path }, { parser_c }, false, true, false)
+            local comp_parser = get_comp_cmd(c_comp, parser_o, { repo_path }, { parser_c }, false, true, false, true)
             if utils.run_cmd_sync(comp_parser, on_compile_error).code ~= 0 then
                 return false
             end
 
             -- compile scanner
-            local comp_scanner = get_comp_cmd(cpp_comp, scanner_o, { repo_path }, { scanner_cc }, false, true, false)
+            local comp_scanner = get_comp_cmd(cpp_comp, scanner_o, { repo_path }, { scanner_cc }, false, true, false, false)
             if utils.run_cmd_sync(comp_scanner, on_compile_error).code ~= 0 then
                 return false
             end
 
             -- link
-            local link_cmd = get_comp_cmd(cpp_comp, out, { repo_path }, { scanner_cc, parser_c }, true, false, true)
+            local link_cmd = get_comp_cmd(cpp_comp, out, { repo_path }, { scanner_cc, parser_c }, true, false, true, false)
             if utils.run_cmd_sync(link_cmd, on_compile_error).code ~= 0 then
                 return false
             end
@@ -291,7 +296,7 @@ local function ts_install(lang, prefix)
             if file_exists(scanner_c) then
                 table.insert(sources, scanner_c)
             end
-            local comp_cmd = get_comp_cmd(c_comp, out, { repo_path }, sources, true, false, false)
+            local comp_cmd = get_comp_cmd(c_comp, out, { repo_path }, sources, true, false, false, true)
             if utils.run_cmd_sync(comp_cmd, on_compile_error).code ~= 0 then
                 return false
             end
