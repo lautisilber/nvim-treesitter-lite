@@ -39,7 +39,7 @@ install_lang() {
 
     # Important to add </dev/null to the nvim command, because otherwise it will
     # consume the stdin of the while loop it's called from
-    timeout "$TIMEOUT" nvim --headless -es \
+    timeout "$TIMEOUT" nvim --headless \
         -u "$SCRIPT_DIR/minimal_nvim_config.lua" \
         -c "TSInstall $lang" \
         -c "qall" \
