@@ -19,6 +19,7 @@ local bundled_languages = {
 
 -- The directory where parsers have to be saved for nvim's bundled tree-sitter to detect them
 local parser_dir = vim.fn.stdpath("data") .. "/site/parser"
+local queries_dir = vim.fn.stdpath("data") .. "/site/queries"
 
 ---Get the path to the parser from the parser
 ---@param parser string
@@ -26,6 +27,7 @@ local parser_dir = vim.fn.stdpath("data") .. "/site/parser"
 local function get_parser_path_from_parser(parser)
     return parser_dir .. "/" .. parser .. ".so"
 end
+
 
 ---Get all parsers associated with a language
 ---@param lang string
@@ -56,6 +58,23 @@ local function get_lang_from_parser(parser)
         end
     end
     return parser
+end
+
+
+---Get the path to the queries directory from the lang
+---@param lang string
+---@return string
+local function get_querires_path_from_lang(lang)
+    return queries_dir .. "/" .. lang
+end
+
+
+---Get the path to the queries directory from the parser
+---@param parser string
+---@return string
+local function get_queries_path_from_parser(parser)
+    local lang = get_lang_from_parser(parser)
+    return get_querires_path_from_lang(lang)
 end
 
 ---Get all parser paths associated with a language
@@ -153,6 +172,7 @@ end
 ---Install a language's parser(s)
 ---@param lang string
 ---@param prefix string?
+---@return boolean
 local function ts_install(lang, prefix)
     if prefix == nil then
         prefix = "TSInstall"
@@ -160,16 +180,16 @@ local function ts_install(lang, prefix)
 
     if bundled_languages[lang] ~= nil then
         vim.notify(prefix .. ": " .. lang .. " is already bundled with nvim >= 0.12. No need to install it manually", vim.log.levels.INFO)
-        return
+        return true
     end
     if is_language_installed(lang, true) then
         vim.notify(prefix .. ": " .. lang .. " is already installed (call :TSUpdate " .. lang .. " if you want to update it)", vim.log.levels.WARN)
-        return
+        return true
     end
 
     if require("nvim-treesitter-lite").languages[lang] == nil then
         vim.notify(prefix .. ": language '" .. lang .. "' is not supported", vim.log.levels.ERROR)
-        return
+        return false
     end
 
     ensure_dir(parser_dir)
@@ -282,50 +302,79 @@ local function ts_install(lang, prefix)
         return true
     end
 
+    local function install_queries(queries_src_path)
+        local function copy(src_file, dst_dir)
+            -- TODO: check if this function has an error
+            ensure_dir(dst_dir)
+            local filename = utils.get_basename(src_file)
+            vim.fn.writefile(vim.fn.readfile(src_file), dst_dir .. "/" .. filename)
+        end
+        local queries_dest = get_querires_path_from_lang(lang)
+        local queries_src = vim.fn.glob(queries_src_path .. "/*.scm", false, true)
+        for _, query_file in ipairs(queries_src) do
+            copy(query_file, queries_dest)
+        end
+    end
+
     -- from here on, we can't crash, since we need to remove the tmp file
     local tmp = vim.fn.tempname()
-    local ok, err = pcall(function ()
+    local ok, res = pcall(function ()
+        -- clone repo
         local url = utils.git_repo_url(require("nvim-treesitter-lite").languages[lang]["url"])
         if not clone_git_repo(url, tmp, prefix, require("nvim-treesitter-lite").languages[lang]["tag"]) then return end
 
+        -- compile and install parser
         if require("nvim-treesitter-lite").languages[lang].build ~= nil then
             local cmd = require("nvim-treesitter-lite").languages[lang].build(utils, tmp, parser_dir)
             if cmd == nil then
                 vim.notify(prefix .. ": failed to create custom build command for " .. lang, vim.log.levels.ERROR)
-                return
+                return false
             end
             if utils.run_cmd_sync(cmd).code ~= 0 then
                 vim.notify(prefix .. ": custom build failed for " .. lang, vim.log.levels.ERROR)
-                return
+                return false
             end
         elseif require("nvim-treesitter-lite").languages[lang].parsers then
             for _, parser in ipairs(require("nvim-treesitter-lite").languages[lang].parsers) do
                 local parser_name = parser.name
-                local repo_path = tmp .. "/" .. parser.subpath .. "/src"
-                install_parser(repo_path, parser_name)
+                local source_path = tmp .. "/" .. parser.subpath .. "/src"
+                install_parser(source_path, parser_name)
             end
         else
             install_parser(tmp .. "/src", lang)
         end
 
+        -- install queries
+        local queries_subpath = (
+            require("nvim-treesitter-lite").languages[lang].queries ~= nil and
+            require("nvim-treesitter-lite").languages[lang].queries or
+            "queries"
+        )
+        install_queries(tmp .. "/" .. queries_subpath)
+        return true
     end)
 
     -- always delete temporary file
     vim.fn.delete(tmp, "rf")
 
     if not ok then
-        vim.notify(prefix .. ": Unexpected error: " .. err, vim.log.levels.ERROR)
+        vim.notify(prefix .. ": Unexpected error: " .. res, vim.log.levels.ERROR)
+        return false
     end
+    return not not res -- cast res to boolean
 end
 
 ---Uninstalls all parsers linked to a language
 ---@param lang string
 ---@param prefix string?
+---@return boolean
 local function ts_uninstall(lang, prefix)
     if prefix == nil then
         prefix = "TSUninstall"
     end
+    local res = true
 
+    -- uninstall parsers
     local paths = get_parser_paths_from_lang(lang)
     local missing_paths = {}
 
@@ -334,6 +383,7 @@ local function ts_uninstall(lang, prefix)
         if file_exists(path) then
             if vim.fn.delete(path) ~= 0 then
                 vim.notify(prefix .. ": error deleting parser " .. parser .. " (path '" .. path .. "')", vim.log.levels.ERROR)
+                res = false
             end
         else
             table.insert(missing_paths, { path = path, parser = parser })
@@ -341,9 +391,10 @@ local function ts_uninstall(lang, prefix)
     end
 
     if #missing_paths == 0 then
-        vim.notify(prefix .. ": uninstalled " .. lang, vim.log.levels.INFO)
+        vim.notify(prefix .. ": uninstalled " .. lang .. " parser" .. (#paths > 1 and "s" or ""), vim.log.levels.INFO)
     elseif #missing_paths == #paths then
         vim.notify(prefix .. ": couldn't uninstall any parser linked to the language " .. lang, vim.log.levels.ERROR)
+        res = false
     else
         local msg_parsers = ""
         local msg_paths = ""
@@ -356,7 +407,29 @@ local function ts_uninstall(lang, prefix)
             end
         end
         vim.notify(prefix .. ": couldn't uninstall parsers " .. msg_parsers .. " in paths " .. msg_paths, vim.log.levels.ERROR)
+        res = false
     end
+
+    -- uninstall queries
+    local queries_path = get_querires_path_from_lang(lang)
+    if dir_exists(queries_path) then
+        local n_queries = #vim.fn.glob(queries_path .. "/*.scm", false, true)
+        local success = vim.fn.delete(queries_path, "rf") == 0
+        if success then
+            if n_queries >= 1 then
+                vim.notify(prefix .. ": uninstalled " .. lang .. (n_queries > 1 and " queries" or " query"), vim.log.levels.INFO)
+            else
+                vim.notify(prefix .. ": no queries were installed for " .. lang, vim.log.levels.INFO)
+            end
+        else
+            vim.notify(prefix .. ": failed to uninstall " .. lang .. (n_queries > 1 and " queries" or " query"), vim.log.levels.ERROR)
+            res = false
+        end
+    else
+        vim.notify(prefix .. ": no queries were installed for " .. lang, vim.log.levels.INFO)
+    end
+
+    return res
 end
 
 ---Will update all parsers linked to a lang by uninstalling and installing them
