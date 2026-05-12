@@ -1,4 +1,4 @@
--- prints every language followed by the associated parsers, separated by ':'
+-- prints every language and its configurations separated by a '|'. Each configuration parameter is in turn separated by ":"
 
 local args = false
 local tiers = {}
@@ -19,9 +19,10 @@ if not args then
 end
 
 local languages = require("languages")
-local sep = ":"
+local sep = "|"
+local subsep = ":"
 for lang, obj in pairs(languages) do
-    local s = lang
+    local s = lang .. sep
 
     local is_tier_3 = obj.build ~= nil
     local is_tier_2 = obj.parsers ~= nil and not is_tier_3
@@ -35,12 +36,29 @@ for lang, obj in pairs(languages) do
 
     if wanted_lang then
         if obj.parsers ~= nil then
-            for _, parser in ipairs(obj.parsers) do
-                s = s .. sep .. parser.name
+            for i, parser in ipairs(obj.parsers) do
+                s = s .. parser.name
+                if i < #obj.parsers then
+                    s = s .. subsep
+                else
+                    s = s .. sep
+                end
             end
         else
-            s = s .. sep .. lang
+            s = s .. lang .. sep
         end
+
+        if obj.queries ~= nil then
+            for i, queries in ipairs(obj.queries) do
+                s = s .. queries.name
+                if i < #obj.queries then
+                    s = s .. subsep
+                else
+                    s = s .. sep
+                end
+            end
+        end
+
         print(s)
     end
 end

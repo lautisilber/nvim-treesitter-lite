@@ -22,11 +22,13 @@ done
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PARSER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/parser"
+QUERIES_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/queries"
 FAILED=()
 
 echo "Test TSInstall"
 echo "PARSER_DIR: $PARSER_DIR"
-rm -f "$PARSER_DIR"/*.so
+rm -f "${PARSER_DIR:?}"/*.so
+rm -rf "${QUERIES_DIR:?}"/*
 
 get_languages() {
     LUA_PATH="$SCRIPT_DIR/../lua/nvim-treesitter-lite/?.lua;;" lua "$SCRIPT_DIR/get_parsers.lua"
@@ -44,21 +46,57 @@ install_lang() {
         </dev/null 2>&1
 }
 
+check_parsers_installed() {
+    local parsers_str="$1"
+    IFS=':' read -ra parsers <<< "$parsers_str"
+    for parser in "${parsers[@]}"; do
+        if [ ! -f "$PARSER_DIR/$parser.so" ]; then
+            return 1
+        fi
+    done
+    return 0
+}
+
+check_queries_installed() {
+    local queries_str="$1"
+    if [ -z "$queries_str" ]; then
+        return 0  # no queries expected
+    fi
+    IFS=':' read -ra queries <<< "$queries_str"
+    for query in "${queries[@]}"; do
+        if [ ! -d "$QUERIES_DIR/$query" ]; then
+            return 1
+        fi
+        local scm_count
+        scm_count=$(find "$QUERIES_DIR/$query" -name "*.scm" | wc -l)
+        if [ "$scm_count" -eq 0 ]; then
+            return 1
+        fi
+    done
+    return 0
+}
+
 while IFS= read -r line; do
 
-    IFS=':' read -ra parts <<< "$line"
+    IFS='|' read -ra parts <<< "$line"
     lang="${parts[0]}"
-    parsers=("${parts[@]:1}")
+    parsers_str="${parts[1]}"
+    queries_str="${parts[2]}"
 
+    echo "Testing: $lang"
     install_lang "$lang"
 
     lang_failed=false
-    for parser in "${parsers[@]}"; do
-        if [ ! -f "$PARSER_DIR/$parser.so" ]; then
-            echo "FAIL: $lang — missing $parser.so"
-            lang_failed=true
-        fi
-    done
+
+    if ! check_parsers_installed "$parsers_str"; then
+        echo "FAIL: $lang — missing parser(s)"
+        lang_failed=true
+    fi
+
+    if ! check_queries_installed "$queries_str"; then
+        echo "FAIL: $lang — missing query file(s)"
+        lang_failed=true
+    fi
 
     if [ "$lang_failed" = false ]; then
         echo "PASS: $lang"
