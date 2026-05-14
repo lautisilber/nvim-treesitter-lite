@@ -193,58 +193,108 @@ local function ts_install(lang, prefix)
 
     ensure_dir(parser_dir)
 
-    local function install_parser(repo_path, parser)
+    local function install_parser(repo_path, parser, tmp_dir)
         local out = get_parser_path_from_parser(parser)
 
-        local c_comp = utils.get_c_comp_path()
-        if c_comp == nil then
-            vim.notify(prefix .. ": couldn't find a c compiler", vim.log.levels.ERROR)
-            return false
-        end
-
         ---Produce a compilation command with appropiate arguments
-        ---@param comp string
-        ---@param out string
         ---@param includes string[]
         ---@param sources string[]
-        ---@param shared boolean
-        ---@param no_link boolean
-        ---@param stdlibpp boolean
-        ---@param c11 boolean
-        ---@return string[]
-        local function get_comp_cmd(comp, out, includes, sources, shared, no_link, stdlibpp, c11)
-            local cmd = {
-                comp,
-                "-fPIC",
-                "-O3",
-                "-o", out,
+        ---@return string[][]?
+        local function get_comp_cmd(includes, sources)
+            local accepted_c_files = {
+                "parser.c", "scanner.c"
+            }
+            local accepted_cpp_files = {
+                "scanner.cc"
             }
 
-            if shared then
-                table.insert(cmd, "-shared")
+            local c_src = {}
+            local cpp_src = {}
+            for _, s in ipairs(sources) do
+                local basename = utils.get_basename(s)
+                if utils.contains(accepted_c_files, basename) then
+                    table.insert(c_src, s)
+                elseif utils.contains(accepted_cpp_files, basename) then
+                    table.insert(cpp_src, s)
+                end
             end
 
-            if stdlibpp then
-                table.insert(cmd, "-lstdc++")
+            local function base_flags(comp)
+                local cmd = { comp, "-fPIC", "-O3" }
+                for _, include_path in ipairs(includes) do
+                    table.insert(cmd, "-I" .. include_path)
+                end
+                return cmd
             end
 
-            for _, include_path in ipairs(includes) do
-                table.insert(cmd, "-I" .. include_path)
-            end
+            if #cpp_src > 0 and #c_src > 0 then
+                local c_comp = utils.get_c_comp_path()
+                if c_comp == nil then
+                    vim.notify(prefix .. ": couldn't get c compiler", vim.log.levels.ERROR)
+                    return nil
+                end
+                local cpp_comp = utils.get_cpp_comp_path()
+                if cpp_comp == nil then
+                    vim.notify(prefix .. ": couldn't get cpp compiler", vim.log.levels.ERROR)
+                    return nil
+                end
 
-            if no_link then
-                table.insert(cmd, "-c")
-            end
+                local cmds = {}
+                local objs = {}
 
-            if c11 then
-                table.insert(cmd, "-std=c11")
-            end
+                -- compile each .c file with gcc
+                for _, s in ipairs(c_src) do
+                    local o = tmp_dir .. "/" .. utils.get_basename(s):match("(.+)%.") .. ".o"
+                    table.insert(objs, o)
+                    local cmd = base_flags(c_comp)
+                    vim.list_extend(cmd, { "-c", "-o", o, s })
+                    table.insert(cmds, cmd)
+                end
 
-            for _, source_path in ipairs(sources) do
-                table.insert(cmd, source_path)
-            end
+                -- compile each .cc/.cpp file with g++
+                for _, s in ipairs(cpp_src) do
+                    local o = tmp_dir .. "/" .. utils.get_basename(s):match("(.+)%.") .. ".o"
+                    table.insert(objs, o)
+                    local cmd = base_flags(cpp_comp)
+                    vim.list_extend(cmd, { "-c", "-o", o, s })
+                    table.insert(cmds, cmd)
+                end
 
-            return cmd
+                -- link all .o files with g++
+                local link_cmd = base_flags(cpp_comp)
+                vim.list_extend(link_cmd, { "-shared", "-lstdc++", "-o", out })
+                vim.list_extend(link_cmd, objs)
+                table.insert(cmds, link_cmd)
+
+                return cmds
+            elseif #cpp_src > 0 then
+                local cpp_comp = utils.get_cpp_comp_path()
+                if cpp_comp == nil then
+                    vim.notify(prefix .. ": couldn't get cpp compiler", vim.log.levels.ERROR)
+                    return nil
+                end
+
+                local cmd = base_flags(cpp_comp)
+                utils.extend(cmd, { "-shared", "-lstdc++", "-o", out })
+                utils.extend(cmd, cpp_src)
+
+                return { cmd }
+            elseif #c_src > 0 then
+                local c_comp = utils.get_c_comp_path()
+                if c_comp == nil then
+                    vim.notify(prefix .. ": couldn't get cpp compiler", vim.log.levels.ERROR)
+                    return nil
+                end
+
+                local cmd = base_flags(c_comp)
+                utils.extend(cmd, { "-shared", "-o", out })
+                utils.extend(cmd, c_src)
+
+                return { cmd }
+            else
+                vim.notify(prefix .. ": no valid sources provided to compile parser", vim.log.levels.ERROR)
+                return nil
+            end
         end
 
         local function on_compile_error(vim_system_completed)
@@ -253,51 +303,10 @@ local function ts_install(lang, prefix)
             vim.notify(prefix .. ": couldn't finish compile step with code " .. code .. " and error: " .. stderr, vim.log.levels.ERROR)
         end
 
-        local parser_c = repo_path .. "/parser.c"
-        local scanner_c = repo_path .. "/scanner.c"
-        local scanner_cc = repo_path .. "/scanner.cc"
-
-        if file_exists(repo_path .. "/scanner.cc") then
-            -- we have a c++ file
-            local cpp_comp = utils.get_cpp_comp_path()
-            if cpp_comp == nil then
-                vim.notify(prefix .. ": couldn't find a c++ compiler", vim.log.levels.ERROR)
-                return false
-            end
-
-
-            local parser_o = repo_path .. "/parser.o"
-            local scanner_o = repo_path .. "/scanner.o"
-
-            -- compile parser
-            local comp_parser = get_comp_cmd(c_comp, parser_o, { repo_path }, { parser_c }, false, true, false, true)
-            if utils.run_cmd_sync(comp_parser, on_compile_error).code ~= 0 then
-                return false
-            end
-
-            -- compile scanner
-            local comp_scanner = get_comp_cmd(cpp_comp, scanner_o, { repo_path }, { scanner_cc }, false, true, false, false)
-            if utils.run_cmd_sync(comp_scanner, on_compile_error).code ~= 0 then
-                return false
-            end
-
-            -- link
-            local link_cmd = get_comp_cmd(cpp_comp, out, { repo_path }, { scanner_cc, parser_c }, true, false, true, false)
-            if utils.run_cmd_sync(link_cmd, on_compile_error).code ~= 0 then
-                return false
-            end
-
-        else
-            -- we only have c files
-            local sources = {}
-            if file_exists(parser_c) then
-                table.insert(sources, parser_c)
-            end
-            if file_exists(scanner_c) then
-                table.insert(sources, scanner_c)
-            end
-            local comp_cmd = get_comp_cmd(c_comp, out, { repo_path }, sources, true, false, false, true)
-            if utils.run_cmd_sync(comp_cmd, on_compile_error).code ~= 0 then
+        local comp_cmds = get_comp_cmd({ repo_path }, vim.fn.glob(repo_path .. "/*", false, true))
+        if comp_cmds == nil then return false end
+        for _, cmd in ipairs(comp_cmds) do
+            if utils.run_cmd_sync(cmd, on_compile_error).code ~= 0 then
                 return false
             end
         end
@@ -320,18 +329,26 @@ local function ts_install(lang, prefix)
                 local query_dest = queries_dir .. "/" .. name
                 local subpath = query.subpath
                 local queries_src = vim.fn.glob(repo_path .. "/" .. subpath .. "/*.scm", false, true)
-                for _, query_file in ipairs(queries_src) do
-                    copy(query_file, query_dest)
+                if #queries_src == 0 then
+                    vim.notify(prefix ..": " .. name .. " has no queries to install", vim.log.levels.INFO)
+                else
+                    for _, query_file in ipairs(queries_src) do
+                        copy(query_file, query_dest)
+                    end
+                    vim.notify(prefix ..": installed " .. name .. " queries", vim.log.levels.INFO)
                 end
-                vim.notify(prefix ..": installed " .. name .. " queries", vim.log.levels.INFO)
             end
         else
             local query_dest = queries_dir .. "/" .. lang
             local queries_src = vim.fn.glob(repo_path .. "/queries/*.scm", false, true)
-            for _, query_file in ipairs(queries_src) do
-                copy(query_file, query_dest)
+            if #queries_src == 0 then
+                vim.notify(prefix ..": " .. lang .. " has no queries to install", vim.log.levels.INFO)
+            else
+                for _, query_file in ipairs(queries_src) do
+                    copy(query_file, query_dest)
+                end
+                vim.notify(prefix ..": installed " .. lang .. " queries", vim.log.levels.INFO)
             end
-            vim.notify(prefix ..": installed " .. lang .. " queries", vim.log.levels.INFO)
         end
         return true
     end
@@ -358,10 +375,10 @@ local function ts_install(lang, prefix)
             for _, parser in ipairs(require("nvim-treesitter-lite").languages[lang].parsers) do
                 local parser_name = parser.name
                 local source_path = tmp .. "/" .. parser.subpath .. "/src"
-                install_parser(source_path, parser_name)
+                install_parser(source_path, parser_name, tmp)
             end
         else
-            install_parser(tmp .. "/src", lang)
+            install_parser(tmp .. "/src", lang, tmp)
         end
 
         -- install queries
@@ -433,16 +450,16 @@ local function ts_uninstall(lang, prefix)
             local success = vim.fn.delete(queries_path, "rf") == 0
             if success then
                 if n_queries >= 1 then
-                    vim.notify(prefix .. ": uninstalled " .. lang .. (n_queries > 1 and " queries" or " query"), info_level)
+                    vim.notify(prefix .. ": uninstalled " .. utils.get_basename(queries_path) .. (n_queries > 1 and " queries" or " query"), info_level)
                 else
                     vim.notify(prefix .. ": no queries were installed for " .. lang, info_level)
                 end
             else
-                vim.notify(prefix .. ": failed to uninstall " .. lang .. (n_queries > 1 and " queries" or " query"), vim.log.levels.ERROR)
+                vim.notify(prefix .. ": failed to uninstall " .. utils.get_basename(queries_path) .. (n_queries > 1 and " queries" or " query"), vim.log.levels.ERROR)
                 res = false
             end
         else
-            vim.notify(prefix .. ": no queries were installed for " .. lang, info_level)
+            vim.notify(prefix .. ": no queries were installed for " .. utils.get_basename(queries_path), info_level)
         end
     end
     return res

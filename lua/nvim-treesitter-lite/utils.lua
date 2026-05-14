@@ -59,10 +59,10 @@ local function get_cpp_comp_path()
     end
 
     if os == "macos" then
-        local compilers = { "clang++", "g++", "c++" }
+        local compilers = { "clang++", "g++", "c++", "cpp" }
         return try_executables(compilers)
     elseif os == "linux" then
-        local compilers = { "g++", "clang++", "c++", "clang" }
+        local compilers = { "clang++", "g++", "c++", "cpp", "clang" }
         return try_executables(compilers)
     else
         vim.notify("Windows not supported", vim.log.levels.WARN)
@@ -88,7 +88,7 @@ local function get_c_comp_path()
         local compilers = { "clang", "gcc", "cc" }
         return try_executables(compilers)
     elseif os == "linux" then
-        local compilers = { "gcc", "clang", "cc" }
+        local compilers = { "clang", "gcc", "cc" }
         return try_executables(compilers)
     else
         vim.notify("Windows not supported", vim.log.levels.WARN)
@@ -112,11 +112,44 @@ local function git_repo_url(url)
     return github_url .. url
 end
 
+---Check whether a string ends with a suffix
+---@param str string
+---@param suffix string
+---@return boolean
+local function endswith(str, suffix)
+    return str:sub(-#suffix) == suffix
+end
+
+---Check if array contains value
+---@param arr any[]
+---@param val any
+---@return boolean
+local function contains(arr, val)
+    for _, v in ipairs(arr) do
+        if v == val then
+            return true
+        end
+    end
+    return false
+end
+
+---Extends array with another array
+---@param a1 any[]
+---@param a2 any[]
+local function extend(a1, a2)
+    for _, v in ipairs(a2) do
+        table.insert(a1, v)
+    end
+end
+
 return {
     run_cmd_sync = run_cmd_sync,
     get_basename = get_basename,
     get_cpp_comp_path = get_cpp_comp_path,
     get_c_comp_path = get_c_comp_path,
     git_repo_url = git_repo_url,
+    endswith = endswith,
+    contains = contains,
+    extend = extend,
 }
 
