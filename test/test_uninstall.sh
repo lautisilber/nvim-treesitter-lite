@@ -3,18 +3,24 @@
 trap 'echo ""; echo "Interrupted"; kill $(jobs -p) 2>/dev/null; exit 130' INT
 
 usage() {
-    echo "Usage: $(basename "$0") [-t <seconds>] [-h]"
+    echo "Usage: $(basename "$0") [-t <seconds>] [-o <lang1,lang2,...>] [-l <lang>] [-h]"
     echo ""
     echo "Options:"
-    echo "  -t <seconds> Timeout per language in seconds (default: 30)"
-    echo "  -h           Show this help message"
+    echo "  -t <seconds>          Timeout per language in seconds (default: 30)"
+    echo "  -o <lang1,lang2,...>  Comma-separated list of languages to omit"
+    echo "  -l <lang>             Test a single language, skipping the language list"
+    echo "  -h                    Show this help message"
 }
 
 TIMEOUT="30s"
+OMIT=()
+SINGLE_LANG=""
 
-while getopts "n:t:h" opt; do
+while getopts "t:o:l:h" opt; do
     case "$opt" in
         t) TIMEOUT="$OPTARG" ;;
+        o) IFS=',' read -ra OMIT <<< "$OPTARG" ;;
+        l) SINGLE_LANG="$OPTARG" ;;
         h) usage; exit 0 ;;
         *) usage; exit 1 ;;
     esac
@@ -29,6 +35,16 @@ echo "Test TSUninstall"
 echo "PARSER_DIR: $PARSER_DIR"
 rm -f "${PARSER_DIR:?}"/*.so
 rm -rf "${QUERIES_DIR:?}"/*
+
+is_omitted() {
+    local lang="$1"
+    for omit in "${OMIT[@]}"; do
+        if [ "$lang" = "$omit" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 get_languages() {
     LUA_PATH="$SCRIPT_DIR/../lua/nvim-treesitter-lite/?.lua;;" lua "$SCRIPT_DIR/get_parsers.lua" "$@"
@@ -65,7 +81,7 @@ check_parsers_installed() {
 }
 
 check_queries_installed() {
-    local queries_str="$1"
+local queries_str="$1"
     if [ -z "$queries_str" ]; then
         return 0  # no queries expected
     fi
@@ -120,10 +136,23 @@ tier1_lang="python"
 tier1_sig="$tier1_lang|$tier1_lang|$tier1_lang"
 test_uninstall "$tier1_sig"
 
-# test all tier 2 and tier 3 languages
-while IFS= read -r line; do
-    test_uninstall "$line"
-done < <(get_languages 2 3)
+if [ -n "$SINGLE_LANG" ]; then
+    line="$SINGLE_LANG|$SINGLE_LANG|$SINGLE_LANG"
+    test_uninstall "$SINGLE_LANG"
+else
+    # test all tier 2 and tier 3 languages
+    while IFS= read -r line; do
+        IFS='|' read -ra parts <<< "$line"
+        lang="${parts[0]}"
+
+        if is_omitted "$lang"; then
+            echo "SKIP: $lang"
+            continue
+        fi
+
+        test_uninstall "$line"
+    done < <(get_languages 2 3)
+fi
 
 if [ ${#FAILED[@]} -ne 0 ]; then
     echo ""
