@@ -3,11 +3,12 @@
 ==============================================================================
 CONTENTS                                             *treesitter-lite-contents*
 
-  1. Introduction ................................ |treesitter-lite-intro|
-  2. Requirements ................................ |treesitter-lite-requirements|
-  3. Installation ................................ |treesitter-lite-installation|
-  4. Configuration ............................... |treesitter-lite-config|
-  5. Commands .................................... |treesitter-lite-commands|
+  1. Introduction ............................... |treesitter-lite-intro|
+  2. Requirements ............................... |treesitter-lite-requirements|
+  3. Installation ............................... |treesitter-lite-installation|
+  4. Configuration .............................. |treesitter-lite-config|
+  5. Language definitions ....................... |treesitter-lite-languages|
+  6. Commands ................................... |treesitter-lite-commands|
 
 ==============================================================================
 1. INTRODUCTION                                         *treesitter-lite-intro*
@@ -15,10 +16,11 @@ CONTENTS                                             *treesitter-lite-contents*
 nvim-treesitter-lite is a lightweight plugin for managing tree-sitter parsers.
 It installs, uninstalls, and updates parsers by cloning their repositories and
 compiling them locally, without the overhead of nvim-treesitter.
-
-Parsers are saved to `{stdpath("data")}/site/parser/`, which is on Neovim's
-default runtime path. Neovim's built-in tree-sitter integration picks them up
-from there automatically.
+ 
+Parsers are saved to `{stdpath("data")}/site/parser/` and queries to
+`{stdpath("data")}/site/queries/`, both of which are on Neovim's default
+runtime path. Neovim's built-in tree-sitter integration picks them up
+automatically.
 
 ==============================================================================
 2. REQUIREMENTS                                   *treesitter-lite-requirements*
@@ -49,48 +51,84 @@ Manual ~
 ==============================================================================
 4. CONFIGURATION                                        *treesitter-lite-config*
 
-Call `setup()` with a table to override the defaults. All keys are optional.
+Call `setup()` to add or override language definitions. All keys are optional.
 >lua
     require("nvim-treesitter-lite").setup({
-        special_languages     = { ... },
-        special_language_urls = { ... },
+        languages = {
+            -- your custom language definitions here
+        },
     })
 <
+ 
+User-provided definitions are merged with the built-in ones. If you define a
+language that already exists, your definition takes full precedence.
+ 
+                                              *treesitter-lite-config-languages*
+languages ~
+ 
+A table of language definitions to merge with the built-in ones. See
+|treesitter-lite-languages| for the definition format.
 
-                                      *treesitter-lite-config-special_languages*
-special_languages ~
-
-Languages that have multiple parsers or a non-standard repository layout.
-Each entry requires a `url` and a list of `{ subpath, pname }` pairs.
-
-Default: `{ typescript = { ... } }`
+==============================================================================
+5. LANGUAGE DEFINITIONS                              *treesitter-lite-languages*
+ 
+Languages are defined in three tiers depending on their repository layout.
+The `url` field uses `owner/repo` format (GitHub is assumed).
+ 
+                                               *treesitter-lite-languages-tier1*
+Tier 1 — standard layout ~
+ 
+The repository has a single parser at `src/parser.c` and queries at
+`queries/`. Only a `url` is needed:
 >lua
-    special_languages = {
-        typescript = {
-            url = "https://github.com/tree-sitter/tree-sitter-typescript",
-            pnames = {
-                { subpath = "typescript", pname = "typescript" },
-                { subpath = "tsx",        pname = "tsx" },
-            },
+    python = { url = "tree-sitter/tree-sitter-python" },
+<
+ 
+                                               *treesitter-lite-languages-tier2*
+Tier 2 — multiple parsers ~
+ 
+The repository contains multiple parsers in subdirectories. Each parser
+and query entry requires a `subpath` (relative to the repo root) and a
+`name`:
+>lua
+    typescript = {
+        url = "tree-sitter/tree-sitter-typescript",
+        parsers = {
+            { subpath = "typescript", name = "typescript" },
+            { subpath = "tsx",        name = "tsx" },
+        },
+        queries = {
+            { subpath = "queries", name = "typescript" },
+            { subpath = "queries", name = "tsx" },
         },
     },
 <
-
-                                  *treesitter-lite-config-special_language_urls*
-special_language_urls ~
-
-Languages whose repository URL does not follow the standard pattern
-`https://github.com/tree-sitter/tree-sitter-<lang>`.
-
-Default: `{}`
+ 
+                                               *treesitter-lite-languages-tier3*
+Tier 3 — custom build ~
+ 
+For repositories with a non-standard build process. Provide a `build`
+function that receives `utils`, `repo_path`, and `out_dir`, and returns
+a list of commands to execute or `nil` on failure. `parsers` and
+`queries` only need a `name` (no `subpath` required):
 >lua
-    special_language_urls = {
-        blade = "https://github.com/EmranMR/tree-sitter-blade",
+    mylang = {
+        url = "someone/tree-sitter-mylang",
+        build = function(utils, repo_path, out_dir)
+            return {
+                utils.get_c_comp_path(),
+                "-shared", "-fPIC", "-O3",
+                "-o", out_dir .. "/mylang.so",
+                repo_path .. "/src/parser.c",
+            }
+        end,
+        parsers = { { name = "mylang" } },
+        queries = { { name = "mylang" } },
     },
 <
 
 ==============================================================================
-5. COMMANDS                                           *treesitter-lite-commands*
+6. COMMANDS                                           *treesitter-lite-commands*
 
                                                                   *:TSInstall*
 :TSInstall {lang}
@@ -98,8 +136,8 @@ Default: `{}`
     Parsers are cloned from GitHub and compiled locally.
 
                                                                 *:TSUninstall*
-:TSUninstall [{lang} ...]
-    Uninstall the parser(s) associated with each {lang}.
+:TSUninstall {lang}
+    Uninstall the parser(s) associated with {lang}.
 
                                                                    *:TSUpdate*
 :TSUpdate [{lang} ...]
@@ -110,5 +148,10 @@ Default: `{}`
 :TSInfo
     Print a list of all currently installed languages.
 
+                                                                     *:TSList*
+:TSList
+    Print a list of all available languages.
+
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl:
+
