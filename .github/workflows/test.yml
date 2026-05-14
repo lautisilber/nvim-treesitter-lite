@@ -21,10 +21,10 @@ jobs:
           version: stable
 
       - name: Test TSInstall
-        run: bash test/test_install.sh -t 120s
+        run: bash test/test_install.sh -t 120s -o yaml
 
       - name: Test TSUninstall
-        run: bash test/test_uninstall.sh -t 120s
+        run: bash test/test_uninstall.sh -t 120s -o yaml
 
       - name: Test TSUpdate
-        run: bash test/test_update.sh -t 120s
+        run: bash test/test_update.sh -t 120s -o yaml
